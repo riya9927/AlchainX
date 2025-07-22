@@ -28,12 +28,69 @@ export default function Marketplace({ onModelSelect }: MarketplaceProps) {
     { id: 'price-high', label: 'Price: High to Low', icon: null }
   ];
 
-  const filteredModels = mockModels.filter(model => {
-    const matchesSearch = model.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         model.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || model.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const filteredAndSortedModels = mockModels
+    .filter(model => {
+      const matchesSearch = model.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           model.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategory === 'all' || model.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'trending': {
+          // Sort by trending status first, then by usage
+          if (a.trending !== b.trending) {
+            return b.trending ? 1 : -1;
+          }
+          // Parse usage numbers (e.g., "12.4K" -> 12400)
+          const usageA = parseFloat(a.usage.replace('K', '')) * (a.usage.includes('K') ? 1000 : 1);
+          const usageB = parseFloat(b.usage.replace('K', '')) * (b.usage.includes('K') ? 1000 : 1);
+          return usageB - usageA;
+        }
+        
+        case 'newest': {
+          // Sort by update date (newest first) - convert relative time strings to comparable numbers
+          const getTimeValue = (timeStr: string): number => {
+            if (timeStr.includes('day')) {
+              const days = parseInt(timeStr.match(/\d+/)?.[0] || '0');
+              return days;
+            } else if (timeStr.includes('week')) {
+              const weeks = parseInt(timeStr.match(/\d+/)?.[0] || '0');
+              return weeks * 7; // convert weeks to days
+            } else if (timeStr.includes('month')) {
+              const months = parseInt(timeStr.match(/\d+/)?.[0] || '0');
+              return months * 30; // convert months to days (approximate)
+            }
+            return 0; // for "today" or other formats
+          };
+          
+          const timeA = getTimeValue(a.updatedAt);
+          const timeB = getTimeValue(b.updatedAt);
+          return timeA - timeB; // smaller number = more recent
+        }
+        
+        case 'rating':
+          // Sort by rating (highest first)
+          return b.rating - a.rating;
+        
+        case 'price-low': {
+          // Sort by price (lowest first)
+          const priceA = parseFloat(a.price.replace(/[^0-9.]/g, ''));
+          const priceB = parseFloat(b.price.replace(/[^0-9.]/g, ''));
+          return priceA - priceB;
+        }
+        
+        case 'price-high': {
+          // Sort by price (highest first)
+          const priceHighA = parseFloat(a.price.replace(/[^0-9.]/g, ''));
+          const priceHighB = parseFloat(b.price.replace(/[^0-9.]/g, ''));
+          return priceHighB - priceHighA;
+        }
+        
+        default:
+          return 0;
+      }
+    });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -116,12 +173,12 @@ export default function Marketplace({ onModelSelect }: MarketplaceProps) {
         <div className="flex-1">
           <div className="flex items-center justify-between mb-6">
             <p className="text-gray-400">
-              Showing {filteredModels.length} of {mockModels.length} models
+              Showing {filteredAndSortedModels.length} of {mockModels.length} models
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredModels.map((model) => (
+            {filteredAndSortedModels.map((model) => (
               <ModelCard
                 key={model.id}
                 model={model}
@@ -130,7 +187,7 @@ export default function Marketplace({ onModelSelect }: MarketplaceProps) {
             ))}
           </div>
 
-          {filteredModels.length === 0 && (
+          {filteredAndSortedModels.length === 0 && (
             <div className="text-center py-16">
               <Brain className="w-24 h-24 text-gray-600 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-white mb-2">No models found</h3>
