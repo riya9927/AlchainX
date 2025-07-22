@@ -1,12 +1,31 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Upload, FileText, Settings, Brain, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Upload, FileText, Settings, Brain, Check, Wallet, Loader, ExternalLink } from 'lucide-react';
+import { ethers } from 'ethers';
+import abi from '../contracts/abi.json'; // Import the ABI
+
+// ----------- CONFIGURATION -----------
+// PASTE THE CONTRACT ADDRESS YOU GOT FROM REMIX HERE
+const CONTRACT_ADDRESS = "0x358AA13c52544ECCEF6B0ADD0f801012ADAD5eE3";
+// -----------------------------------
 
 interface UploadModelProps {
   onBack: () => void;
 }
 
+// Define the structure of the browser's window.ethereum object
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
+
 export default function UploadModel({ onBack }: UploadModelProps) {
   const [currentStep, setCurrentStep] = useState(1);
+  const [account, setAccount] = useState<string | null>(null);
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [txHash, setTxHash] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
   const [modelData, setModelData] = useState({
     name: '',
     description: '',
@@ -16,6 +35,65 @@ export default function UploadModel({ onBack }: UploadModelProps) {
     license: 'single-use',
     file: null as File | null
   });
+
+  const connectWallet = async () => {
+    setError(null);
+    if (typeof window.ethereum !== 'undefined') {
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        setAccount(accounts[0]);
+      } catch (e) {
+        console.error("Connection request rejected", e);
+        setError("You rejected the connection request. Please connect your wallet to continue.");
+      }
+    } else {
+      setError("MetaMask is not installed. Please install it to use this feature.");
+    }
+  };
+
+  const handleDeploy = async () => {
+      if (!account) {
+          setError("Please connect your wallet first.");
+          return;
+      }
+      if (!modelData.name || !modelData.description || !modelData.license) {
+          setError("Please fill in all required fields: Model Name, Description, and License.");
+          return;
+      }
+
+      setIsDeploying(true);
+      setError(null);
+      setTxHash(null);
+
+      try {
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const signer = await provider.getSigner();
+          const contract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
+
+          // NOTE: For the prototype, we are not uploading the file to IPFS to save time.
+          // We are just creating the token on the blockchain.
+          console.log("Calling mintModel function with:", modelData.name, modelData.description, modelData.license);
+
+          const transaction = await contract.mintModel(
+              modelData.name,
+              modelData.description,
+              modelData.license
+          );
+
+          console.log("Transaction sent:", transaction.hash);
+          await transaction.wait(); // Wait for the transaction to be mined
+
+          setTxHash(transaction.hash);
+          console.log("Transaction successful:", transaction.hash);
+
+      } catch (e: any) {
+          console.error("Deployment failed:", e);
+          setError(e.reason || "An error occurred during deployment. Check the console for details.");
+      } finally {
+          setIsDeploying(false);
+      }
+  };
+
 
   const steps = [
     { number: 1, title: 'Upload Model', icon: Upload },
@@ -57,9 +135,11 @@ export default function UploadModel({ onBack }: UploadModelProps) {
     }
   };
 
-  const renderStep = () => {
+    const renderStep = () => {
+    // Renders Steps 1, 2, 3 as you designed them.
+    // The key changes are in Step 4.
     switch (currentStep) {
-      case 1:
+        case 1:
         return (
           <div className="space-y-6">
             <div className="text-center">
@@ -241,64 +321,84 @@ export default function UploadModel({ onBack }: UploadModelProps) {
             </div>
           </div>
         );
+            case 4: // REVIEW & DEPLOY STEP
+                return (
+                    <div className="space-y-6">
+                        <div className="text-center">
+                            <h2 className="text-2xl font-bold text-white mb-4">Review & Deploy</h2>
+                            <p className="text-gray-400 mb-8">
+                                Review your model details before deploying to the blockchain.
+                            </p>
+                        </div>
 
-      case 4:
-        return (
-          <div className="space-y-6">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-white mb-4">Review & Deploy</h2>
-              <p className="text-gray-400 mb-8">
-                Review your model details before deploying to the blockchain
-              </p>
-            </div>
+                        {/* --- Wallet Connection --- */}
+                        {!account ? (
+                            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-6 text-center">
+                                <h3 className="text-lg font-semibold text-yellow-400 mb-4">Action Required</h3>
+                                <p className="text-gray-300 mb-4">Please connect your wallet to deploy the model.</p>
+                                <button
+                                    onClick={connectWallet}
+                                    className="px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-all inline-flex items-center space-x-2"
+                                >
+                                    <Wallet className="w-5 h-5" />
+                                    <span>Connect Wallet</span>
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 text-center">
+                                <p className="text-emerald-400 text-sm">
+                                  Wallet Connected: <span className="font-mono">{`${account.substring(0, 6)}...${account.substring(account.length - 4)}`}</span>
+                                </p>
+                            </div>
+                        )}
+                        
+                        {/* --- Review Details --- */}
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
+                            <div className="flex justify-between">
+                                <span className="text-gray-400">Model Name:</span>
+                                <span className="text-white">{modelData.name || 'Not specified'}</span>
+                            </div>
+                             <div className="flex justify-between">
+                                <span className="text-gray-400">Description:</span>
+                                <span className="text-white text-right max-w-xs truncate">{modelData.description || 'Not specified'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-400">License:</span>
+                                <span className="text-white">
+                                    {licenses.find(l => l.id === modelData.license)?.label}
+                                </span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-400">File:</span>
+                                <span className="text-white">{modelData.file?.name || 'No file selected'}</span>
+                            </div>
+                        </div>
 
-            <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-4">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Model Name:</span>
-                <span className="text-white">{modelData.name || 'Not specified'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Category:</span>
-                <span className="text-white">
-                  {categories.find(c => c.id === modelData.category)?.label || 'Not specified'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">License:</span>
-                <span className="text-white">
-                  {licenses.find(l => l.id === modelData.license)?.label}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Price:</span>
-                <span className="text-white">{modelData.price || '0'} BDAG</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">File:</span>
-                <span className="text-white">{modelData.file?.name || 'No file selected'}</span>
-              </div>
-            </div>
+                        {/* --- Deployment Status --- */}
+                        {(error || txHash) && (
+                            <div className={`rounded-xl p-4 ${error ? 'bg-red-500/10 border border-red-500/30' : 'bg-green-500/10 border border-green-500/30'}`}>
+                                {error && <p className="text-red-400 text-sm">{error}</p>}
+                                {txHash && (
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-green-400 text-sm">Deployment Successful!</p>
+                                        <a href={`https://mumbai.polygonscan.com/tx/${txHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-sm inline-flex items-center">
+                                            View Transaction <ExternalLink className="w-4 h-4 ml-1" />
+                                        </a>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                );
 
-            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-6">
-              <h3 className="text-lg font-semibold text-blue-400 mb-2">Deployment Details</h3>
-              <ul className="text-gray-300 text-sm space-y-1">
-                <li>• Model will be uploaded to IPFS for decentralized storage</li>
-                <li>• Smart contract will be deployed on BlockDAG Primordial Testnet</li>
-                <li>• NFT will be minted representing your model ownership</li>
-                <li>• Gas fees: ~0.1 BDAG (estimated)</li>
-              </ul>
-            </div>
-          </div>
-        );
+            default:
+                return null;
+        }
+    };
 
-      default:
-        return null;
-    }
-  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Back Button */}
       <button
         onClick={onBack}
         className="flex items-center space-x-2 text-gray-400 hover:text-white transition-colors mb-8"
@@ -349,24 +449,33 @@ export default function UploadModel({ onBack }: UploadModelProps) {
         </div>
       </div>
 
-      {/* Step Content */}
       <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-8 mb-8">
         {renderStep()}
       </div>
 
-      {/* Navigation Buttons */}
       <div className="flex justify-between">
         <button
           onClick={handlePrevious}
-          disabled={currentStep === 1}
+          disabled={currentStep === 1 || isDeploying}
           className="px-6 py-3 border border-white/20 text-white rounded-lg hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Previous
         </button>
         
         {currentStep === 4 ? (
-          <button className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all">
-            Deploy Model
+          <button 
+            onClick={handleDeploy}
+            disabled={!account || isDeploying}
+            className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center"
+          >
+            {isDeploying ? (
+              <>
+                <Loader className="animate-spin w-5 h-5 mr-3" />
+                Deploying...
+              </>
+            ) : (
+              'Deploy Model'
+            )}
           </button>
         ) : (
           <button
