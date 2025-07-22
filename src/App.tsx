@@ -21,23 +21,49 @@ function App() {
   const renderCurrentPage = () => {
     switch (currentPage) {
       case 'home':
-        return <Hero onExploreClick={() => setCurrentPage('marketplace')} />;
+        return (
+          <Hero
+            onExploreClick={() => setCurrentPage('marketplace')}
+            onUploadClick={() => setCurrentPage('upload')} // ✅ Added this
+          />
+        );
+
       case 'marketplace':
-        return <Marketplace onModelSelect={handleModelSelect} />;
+        return (
+          <Marketplace onModelSelect={handleModelSelect} />
+        );
+
       case 'model-detail':
-        return <ModelDetail modelId={selectedModelId} onBack={() => setCurrentPage('marketplace')} />;
+        return (
+          <ModelDetail
+            modelId={selectedModelId}
+            onBack={() => setCurrentPage('marketplace')}
+          />
+        );
+
       case 'upload':
-        return <UploadModel onBack={() => setCurrentPage('dashboard')} />;
+        return (
+          <UploadModel onBack={() => setCurrentPage('dashboard')} />
+        );
+
       case 'dashboard':
-        return <Dashboard onUploadClick={() => setCurrentPage('upload')} />;
+        return (
+          <Dashboard onUploadClick={() => setCurrentPage('upload')} />
+        );
+
       default:
-        return <Hero onExploreClick={() => setCurrentPage('marketplace')} />;
+        return (
+          <Hero
+            onExploreClick={() => setCurrentPage('marketplace')}
+            onUploadClick={() => setCurrentPage('upload')}
+          />
+        );
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <Navbar 
+      <Navbar
         currentPage={currentPage}
         onPageChange={setCurrentPage}
         isWalletConnected={isWalletConnected}
