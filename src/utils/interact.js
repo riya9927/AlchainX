@@ -1,7 +1,7 @@
 import { ethers } from "ethers";
 
 // IMPORTANT: After you deploy your contract, you must paste its address here.
-const contractAddress = "0xddaAd340b0f1Ef65169Ae5E41A8b10776a75482d"; 
+const contractAddress = "0x358AA13c52544ECCEF6B0ADD0f801012ADAD5eE3"; 
 
 // This is the Application Binary Interface (ABI).
 // It's a description of the smart contract's functions.
