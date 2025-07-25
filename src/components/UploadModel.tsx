@@ -5,7 +5,7 @@ import abi from '../contracts/abi.json'; // Import the ABI
 
 // ----------- CONFIGURATION -----------
 // PASTE THE CONTRACT ADDRESS YOU GOT FROM REMIX HERE
-const CONTRACT_ADDRESS = "0x358AA13c52544ECCEF6B0ADD0f801012ADAD5eE3";
+const CONTRACT_ADDRESS = "0xddaAd340b0f1Ef65169Ae5E41A8b10776a75482d";
 // -----------------------------------
 
 interface UploadModelProps {
